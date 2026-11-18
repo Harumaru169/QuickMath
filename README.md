@@ -3,6 +3,18 @@
 Quick Math renders LaTeX or Typst formulas on your Mac and copies the result to
 the clipboard as a tightly cropped, transparent PNG.
 
+## Credits
+
+Quick Math is based on [QuickLaTeX](https://github.com/Noamko/QuickLaTeX),
+originally created by [Noamko](https://github.com/Noamko) and published as the
+[quick-latex Raycast extension](https://github.com/raycast/extensions/tree/main/extensions/quick-latex).
+
+- Current maintainer: Harumaru169
+- Original author and contributor: Noamko
+- Contributor: FariaF22
+
+Quick Math is distributed under the [MIT License](LICENSE).
+
 ## Requirements
 
 - Raycast for macOS

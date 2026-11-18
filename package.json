@@ -4,10 +4,10 @@
     "title": "Quick Math",
     "description": "Render LaTeX or Typst math locally and copy it as a transparent PNG.",
     "icon": "circular-integral.png",
-    "author": "Noamko",
+    "author": "Harumaru169",
     "contributors": [
-        "FariaF22",
-        "kosei_haruyama"
+        "Noamko",
+        "FariaF22"
     ],
     "categories": [
         "Design Tools",
