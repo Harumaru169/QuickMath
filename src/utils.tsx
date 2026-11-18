@@ -2,12 +2,8 @@ import { Clipboard, environment } from "@raycast/api";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-export interface QuickLatexArguments {
+export interface QuickMathArguments {
   latex: string | undefined;
-}
-
-export interface QuickLatexPreferences {
-  preamble: string;
 }
 
 const OUTPUT_DIRECTORY = path.join(environment.supportPath, "output");

@@ -13,13 +13,14 @@ import {
 } from "@raycast/api";
 import { useEffect, useState } from "react";
 
-import { getPreviewImage, isAbortError, LatexRenderError, renderFormula } from "./api";
-import { copyPngToClipboard, QuickLatexArguments, QuickLatexPreferences } from "./utils";
+import { FormulaRenderError, getPreviewImage, isAbortError, renderFormula, RenderOptions } from "./api";
+import { copyPngToClipboard, QuickMathArguments } from "./utils";
 
 const PREVIEW_DEBOUNCE_MS = 500;
 
-export default function QuickLatexCommand(props: LaunchProps<{ arguments: QuickLatexArguments }>) {
-  const { preamble } = getPreferenceValues<QuickLatexPreferences>();
+export default function QuickMathCommand(props: LaunchProps<{ arguments: QuickMathArguments }>) {
+  const { renderer, preamble } = getPreferenceValues<RenderOptions>();
+  const engine = renderer === "typst" ? "Typst" : "LaTeX";
   const [searchText, setSearchText] = useState(props.arguments.latex ?? "");
   const [previewImage, setPreviewImage] = useState<Image.ImageLike>();
   const [previewError, setPreviewError] = useState<string>();
@@ -31,7 +32,7 @@ export default function QuickLatexCommand(props: LaunchProps<{ arguments: QuickL
     setIsLoading(true);
 
     const timeout = setTimeout(() => {
-      getPreviewImage(searchText, preamble, abortController.signal)
+      getPreviewImage(searchText, { renderer, preamble }, abortController.signal)
         .then((image) => {
           if (isCurrent) {
             setPreviewImage(image);
@@ -55,16 +56,16 @@ export default function QuickLatexCommand(props: LaunchProps<{ arguments: QuickL
       clearTimeout(timeout);
       abortController.abort();
     };
-  }, [searchText, preamble]);
+  }, [searchText, renderer, preamble]);
 
   async function copyFormula() {
     const toast = await showToast({
       style: Toast.Style.Animated,
-      title: "Rendering LaTeX",
+      title: `Rendering ${engine}`,
     });
 
     try {
-      const png = await renderFormula(searchText, preamble);
+      const png = await renderFormula(searchText, { renderer, preamble });
       await copyPngToClipboard(png);
       toast.style = Toast.Style.Success;
       toast.title = "Copied transparent PNG";
@@ -72,7 +73,7 @@ export default function QuickLatexCommand(props: LaunchProps<{ arguments: QuickL
       await showHUD("Copied transparent PNG to clipboard.");
     } catch (error) {
       toast.style = Toast.Style.Failure;
-      toast.title = "Could not render LaTeX";
+      toast.title = `Could not render ${engine}`;
       toast.message = getErrorMessage(error);
     }
   }
@@ -82,7 +83,7 @@ export default function QuickLatexCommand(props: LaunchProps<{ arguments: QuickL
       isLoading={isLoading}
       onSearchTextChange={setSearchText}
       searchText={searchText}
-      searchBarPlaceholder="Type a LaTeX formula"
+      searchBarPlaceholder={`Type a ${engine} formula`}
     >
       <List.EmptyView
         icon={previewImage}
@@ -100,7 +101,7 @@ export default function QuickLatexCommand(props: LaunchProps<{ arguments: QuickL
 }
 
 function getErrorMessage(error: unknown) {
-  if (error instanceof LatexRenderError) {
+  if (error instanceof FormulaRenderError) {
     return [error.message, error.detail].filter(Boolean).join(" ");
   }
 

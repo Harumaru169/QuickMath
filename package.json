@@ -1,9 +1,9 @@
 {
     "$schema": "https://www.raycast.com/schemas/extension.json",
-    "name": "quick-latex local",
-    "title": "LaTeX to Image",
-    "description": "Converts LaTeX text to image. Copy the image to the Clipboard.",
-    "icon": "bird.png",
+    "name": "quick-math",
+    "title": "Quick Math",
+    "description": "Render LaTeX or Typst math locally and copy it as a transparent PNG.",
+    "icon": "circular-integral.png",
     "author": "Noamko",
     "contributors": [
         "FariaF22",
@@ -20,6 +20,18 @@
     "license": "MIT",
     "preferences": [
         {
+            "name": "renderer",
+            "title": "Rendering Engine",
+            "description": "Choose the syntax and local renderer for your formulas.",
+            "type": "dropdown",
+            "required": false,
+            "default": "latex",
+            "data": [
+                { "title": "LaTeX", "value": "latex" },
+                { "title": "Typst", "value": "typst" }
+            ]
+        },
+        {
             "name": "preamble",
             "title": "Custom Preamble",
             "description": "LaTeX commands appended after the built-in amsmath and amssymb packages.",
@@ -31,17 +43,16 @@
     ],
     "commands": [
         {
-            "name": "quick-latex",
-            "title": "Quick LaTeX",
-            "subtitle": "Quick LaTeX",
-            "description": "Quickly convert LaTeX to image and copy the image to the Clipboard.",
+            "name": "quick-math",
+            "title": "Quick Math",
+            "description": "Preview a LaTeX or Typst formula and copy it as a transparent PNG.",
             "mode": "view",
             "arguments": [
                 {
                     "name": "latex",
                     "type": "text",
                     "required": false,
-                    "placeholder": "LaTeX"
+                    "placeholder": "Formula"
                 }
             ]
         }

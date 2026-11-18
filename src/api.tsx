@@ -17,10 +17,15 @@ const FOREGROUND_SPECS: Record<ForegroundColor, string> = {
   White: "rgb 1 1 1",
 };
 
-export class LatexRenderError extends Error {
+export interface RenderOptions {
+  renderer: "latex" | "typst";
+  preamble: string;
+}
+
+export class FormulaRenderError extends Error {
   constructor(message: string, readonly detail?: string) {
     super(message);
-    this.name = "LatexRenderError";
+    this.name = "FormulaRenderError";
   }
 }
 
@@ -28,40 +33,40 @@ export function isAbortError(error: unknown) {
   return error instanceof Error && error.name === "AbortError";
 }
 
-export async function getPreviewImage(searchText: string, preamble: string, signal?: AbortSignal) {
-  const latex = normalizeLatex(searchText);
-  const workDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "quick-latex-"));
-
-  try {
-    await checkDependencies();
-    const dviPath = await compileToDvi(latex, preamble, workDirectory, signal);
-    const light = await convertDviToPng(dviPath, workDirectory, "preview-light.png", "Black", signal);
-    const dark = await convertDviToPng(dviPath, workDirectory, "preview-dark.png", "White", signal);
-
-    return {
-      source: {
-        light: toPngDataUrl(light),
-        dark: toPngDataUrl(dark),
-      },
-    };
-  } finally {
-    await fs.rm(workDirectory, { recursive: true, force: true });
-  }
+export async function getPreviewImage(searchText: string, options: RenderOptions, signal?: AbortSignal) {
+  const [light, dark] = await renderImages(searchText, options, ["Black", "White"], signal);
+  return { source: { light: toPngDataUrl(light), dark: toPngDataUrl(dark) } };
 }
 
-export async function renderFormula(
+export async function renderFormula(searchText: string, options: RenderOptions) {
+  const [image] = await renderImages(searchText, options, ["Black"]);
+  return image;
+}
+
+async function renderImages(
   searchText: string,
-  preamble: string,
-  foreground: ForegroundColor = "Black",
+  { renderer, preamble }: RenderOptions,
+  colors: ForegroundColor[],
   signal?: AbortSignal
 ) {
-  const latex = normalizeLatex(searchText);
-  const workDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "quick-latex-"));
+  const workDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "quick-math-"));
 
   try {
+    const images: Buffer[] = [];
+    if (renderer === "typst") {
+      for (const color of colors) {
+        images.push(await compileTypst(searchText, workDirectory, color, signal));
+      }
+      return images;
+    }
+
     await checkDependencies();
+    const latex = searchText.trim() === "" ? "LaTeX" : searchText;
     const dviPath = await compileToDvi(latex, preamble, workDirectory, signal);
-    return await convertDviToPng(dviPath, workDirectory, "formula.png", foreground, signal);
+    for (const color of colors) {
+      images.push(await convertDviToPng(dviPath, workDirectory, color, signal));
+    }
+    return images;
   } finally {
     await fs.rm(workDirectory, { recursive: true, force: true });
   }
@@ -82,7 +87,7 @@ async function requireExecutable(executablePath: string, message: string) {
   try {
     await fs.access(executablePath, fsConstants.X_OK);
   } catch {
-    throw new LatexRenderError(message);
+    throw new FormulaRenderError(message);
   }
 }
 
@@ -111,11 +116,10 @@ async function compileToDvi(latex: string, preamble: string, workDirectory: stri
 async function convertDviToPng(
   dviPath: string,
   workDirectory: string,
-  outputName: string,
   foreground: ForegroundColor,
   signal?: AbortSignal
 ) {
-  const outputPath = path.join(workDirectory, outputName);
+  const outputPath = path.join(workDirectory, "formula.png");
 
   await runCommand(
     DVIPNG_PATH,
@@ -126,6 +130,28 @@ async function convertDviToPng(
   );
 
   return fs.readFile(outputPath);
+}
+
+async function compileTypst(
+  searchText: string,
+  workDirectory: string,
+  foreground: ForegroundColor,
+  signal?: AbortSignal
+) {
+  const formula = searchText.trim() || "x";
+  const source = `#set page(width: auto, height: auto, margin: 1pt, fill: none)
+#set text(size: 12pt, fill: ${foreground.toLowerCase()})
+$ ${formula} $
+`;
+  await fs.writeFile(path.join(workDirectory, "formula.typ"), source, "utf8");
+  await runCommand(
+    "typst",
+    ["compile", "--ppi", "512", "--diagnostic-format", "short", "formula.typ", "formula.png"],
+    workDirectory,
+    signal,
+    "Typst could not render this formula."
+  );
+  return fs.readFile(path.join(workDirectory, "formula.png"));
 }
 
 function runCommand(
@@ -157,19 +183,20 @@ function runCommand(
         }
 
         const output = [stdout, stderr].filter(Boolean).join("\n");
-        const detail = extractLatexError(output);
+        if (executable === "typst" && error.code === "ENOENT") {
+          reject(new FormulaRenderError("Typst was not found. Make sure typst is on Raycast's PATH."));
+          return;
+        }
+
+        const detail = executable === "typst" ? output.trim() : extractLatexError(output);
         const message =
           "killed" in error && error.killed
             ? `Rendering timed out after ${PROCESS_TIMEOUT_MS / 1000} seconds.`
             : fallbackMessage;
-        reject(new LatexRenderError(message, detail));
+        reject(new FormulaRenderError(message, detail));
       }
     );
   });
-}
-
-function normalizeLatex(searchText: string) {
-  return searchText.trim() === "" ? "LaTeX" : searchText;
 }
 
 function buildDocument(latex: string, preamble: string) {

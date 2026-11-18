@@ -1,14 +1,23 @@
-# Quick LaTeX
+# Quick Math
 
-Quick LaTeX renders a formula with the TeX installation on your Mac and copies
-the result to the clipboard as a tightly cropped, transparent PNG. Rendering is
-fully local and does not send the formula to an external service.
+Quick Math renders LaTeX or Typst formulas on your Mac and copies the result to
+the clipboard as a tightly cropped, transparent PNG.
 
 ## Requirements
 
 - Raycast for macOS
-- BasicTeX or MacTeX
-- `latex` and `dvipng` under `/Library/TeX/texbin`
+- For LaTeX mode (the default), BasicTeX or MacTeX with `latex` and `dvipng`
+  under `/Library/TeX/texbin`
+- For Typst mode, the `typst` command on Raycast's `PATH`
+
+## Typst mode
+
+In Raycast Settings, open **Quick Math** and set **Rendering Engine** to
+**Typst**. In the Quick Math command, type `frac(a, b)` or another Typst
+formula. The command adds the math delimiters for you. Press Enter to copy the
+rendered PNG.
+
+## LaTeX setup
 
 Check the TeX installation:
 
@@ -47,14 +56,14 @@ npm install
 npm run dev
 ```
 
-You can then assign a Raycast hotkey to **Quick LaTeX**. Type a formula, wait
+You can then assign a Raycast hotkey to **Quick Math**. Type a formula, wait
 for the local preview, and press Enter to copy the transparent PNG. Paste it
 into Noteful or another app with Command-V.
 
 ## Rendering defaults
 
-- Display-math input (`\[ ... \]`)
-- `amsmath` and `amssymb`
+- Display math in both modes
+- `amsmath` and `amssymb` in LaTeX mode
 - Transparent background
 - Black clipboard output
 - 512 DPI
@@ -63,7 +72,7 @@ Color, size, and SVG/PDF export are not part of the initial local renderer.
 
 ## Custom preamble
 
-Open Raycast Settings, select **LaTeX to Image**, and enter additional LaTeX
+Open Raycast Settings, select **Quick Math**, and enter additional LaTeX
 commands in **Custom Preamble**. The setting is appended after the built-in
 `amsmath` and `amssymb` packages and applies to both previews and copied PNGs.
 
