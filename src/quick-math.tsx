@@ -1,8 +1,8 @@
 import {
   Action,
   ActionPanel,
-  Image,
-  LaunchProps,
+  type Image,
+  type LaunchProps,
   List,
   Toast,
   getPreferenceValues,
@@ -13,46 +13,43 @@ import {
 } from "@raycast/api";
 import { useEffect, useState } from "react";
 
-import { FormulaRenderError, getPreviewImage, isAbortError, renderFormula, RenderOptions } from "./api";
-import { copyPngToClipboard, QuickMathArguments } from "./utils";
+import { copyPngToClipboard } from "./clipboard";
+import { FormulaRenderError, renderPng, renderPreview } from "./render";
 
 const PREVIEW_DEBOUNCE_MS = 500;
 
-export default function QuickMathCommand(props: LaunchProps<{ arguments: QuickMathArguments }>) {
-  const { renderer, preamble } = getPreferenceValues<RenderOptions>();
+export default function QuickMathCommand({ arguments: args }: LaunchProps<{ arguments: Arguments.QuickMath }>) {
+  const { renderer, preamble } = getPreferenceValues<Preferences.QuickMath>();
   const engine = renderer === "typst" ? "Typst" : "LaTeX";
-  const [searchText, setSearchText] = useState(props.arguments.latex ?? "");
+  const [searchText, setSearchText] = useState(args.latex ?? "");
   const [previewImage, setPreviewImage] = useState<Image.ImageLike>();
   const [previewError, setPreviewError] = useState<string>();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    let isCurrent = true;
     const abortController = new AbortController();
+    const { signal } = abortController;
     setIsLoading(true);
 
-    const timeout = setTimeout(() => {
-      getPreviewImage(searchText, { renderer, preamble }, abortController.signal)
-        .then((image) => {
-          if (isCurrent) {
-            setPreviewImage(image);
-            setPreviewError(undefined);
-          }
-        })
-        .catch((error: unknown) => {
-          if (isCurrent && !isAbortError(error)) {
-            setPreviewError(getErrorMessage(error));
-          }
-        })
-        .finally(() => {
-          if (isCurrent) {
-            setIsLoading(false);
-          }
-        });
+    const timeout = setTimeout(async () => {
+      try {
+        const image = await renderPreview(searchText, { renderer, preamble }, signal);
+        if (signal.aborted) return;
+
+        setPreviewImage(image);
+        setPreviewError(undefined);
+      } catch (error) {
+        if (!signal.aborted) {
+          setPreviewError(getErrorMessage(error));
+        }
+      } finally {
+        if (!signal.aborted) {
+          setIsLoading(false);
+        }
+      }
     }, PREVIEW_DEBOUNCE_MS);
 
     return () => {
-      isCurrent = false;
       clearTimeout(timeout);
       abortController.abort();
     };
@@ -65,7 +62,7 @@ export default function QuickMathCommand(props: LaunchProps<{ arguments: QuickMa
     });
 
     try {
-      const png = await renderFormula(searchText, { renderer, preamble });
+      const png = await renderPng(searchText, { renderer, preamble });
       await copyPngToClipboard(png);
       toast.style = Toast.Style.Success;
       toast.title = "Copied transparent PNG";

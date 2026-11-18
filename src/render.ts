@@ -10,17 +10,11 @@ const DVIPNG_PATH = path.join(TEX_BIN, "dvipng");
 const PROCESS_TIMEOUT_MS = 8_000;
 const MAX_PROCESS_OUTPUT = 1024 * 1024;
 
-type ForegroundColor = "Black" | "White";
-
-const FOREGROUND_SPECS: Record<ForegroundColor, string> = {
-  Black: "rgb 0 0 0",
-  White: "rgb 1 1 1",
+const LATEX_COLORS = {
+  black: "rgb 0 0 0",
+  white: "rgb 1 1 1",
 };
-
-export interface RenderOptions {
-  renderer: "latex" | "typst";
-  preamble: string;
-}
+type ForegroundColor = keyof typeof LATEX_COLORS;
 
 export class FormulaRenderError extends Error {
   constructor(message: string, readonly detail?: string) {
@@ -29,23 +23,19 @@ export class FormulaRenderError extends Error {
   }
 }
 
-export function isAbortError(error: unknown) {
-  return error instanceof Error && error.name === "AbortError";
-}
-
-export async function getPreviewImage(searchText: string, options: RenderOptions, signal?: AbortSignal) {
-  const [light, dark] = await renderImages(searchText, options, ["Black", "White"], signal);
+export async function renderPreview(formula: string, options: Preferences, signal?: AbortSignal) {
+  const [light, dark] = await renderImages(formula, options, ["black", "white"], signal);
   return { source: { light: toPngDataUrl(light), dark: toPngDataUrl(dark) } };
 }
 
-export async function renderFormula(searchText: string, options: RenderOptions) {
-  const [image] = await renderImages(searchText, options, ["Black"]);
+export async function renderPng(formula: string, options: Preferences) {
+  const [image] = await renderImages(formula, options, ["black"]);
   return image;
 }
 
 async function renderImages(
-  searchText: string,
-  { renderer, preamble }: RenderOptions,
+  formula: string,
+  { renderer, preamble }: Preferences,
   colors: ForegroundColor[],
   signal?: AbortSignal
 ) {
@@ -55,13 +45,13 @@ async function renderImages(
     const images: Buffer[] = [];
     if (renderer === "typst") {
       for (const color of colors) {
-        images.push(await compileTypst(searchText, workDirectory, color, signal));
+        images.push(await compileTypst(formula, workDirectory, color, signal));
       }
       return images;
     }
 
-    await checkDependencies();
-    const latex = searchText.trim() === "" ? "LaTeX" : searchText;
+    await checkLatexDependencies();
+    const latex = formula.trim() ? formula : "LaTeX";
     const dviPath = await compileToDvi(latex, preamble, workDirectory, signal);
     for (const color of colors) {
       images.push(await convertDviToPng(dviPath, workDirectory, color, signal));
@@ -72,7 +62,7 @@ async function renderImages(
   }
 }
 
-async function checkDependencies() {
+async function checkLatexDependencies() {
   await requireExecutable(
     LATEX_PATH,
     `LaTeX was not found at ${LATEX_PATH}. Install BasicTeX or MacTeX and try again.`
@@ -123,7 +113,7 @@ async function convertDviToPng(
 
   await runCommand(
     DVIPNG_PATH,
-    ["-D", "512", "-T", "tight", "-bg", "Transparent", "-fg", FOREGROUND_SPECS[foreground], "-o", outputPath, dviPath],
+    ["-D", "512", "-T", "tight", "-bg", "Transparent", "-fg", LATEX_COLORS[foreground], "-o", outputPath, dviPath],
     workDirectory,
     signal,
     "dvipng could not create the PNG image."
@@ -132,16 +122,10 @@ async function convertDviToPng(
   return fs.readFile(outputPath);
 }
 
-async function compileTypst(
-  searchText: string,
-  workDirectory: string,
-  foreground: ForegroundColor,
-  signal?: AbortSignal
-) {
-  const formula = searchText.trim() || "x";
+async function compileTypst(formula: string, workDirectory: string, foreground: ForegroundColor, signal?: AbortSignal) {
   const source = `#set page(width: auto, height: auto, margin: 1pt, fill: none)
-#set text(size: 12pt, fill: ${foreground.toLowerCase()})
-$ ${formula} $
+#set text(size: 12pt, fill: ${foreground})
+$ ${formula.trim() || "x"} $
 `;
   await fs.writeFile(path.join(workDirectory, "formula.typ"), source, "utf8");
   await runCommand(
@@ -173,22 +157,20 @@ function runCommand(
       },
       (error, stdout, stderr) => {
         if (!error) {
-          resolve();
-          return;
+          return resolve();
         }
 
         if (error.name === "AbortError") {
-          reject(error);
-          return;
+          return reject(error);
+        }
+
+        const isTypst = executable === "typst";
+        if (isTypst && error.code === "ENOENT") {
+          return reject(new FormulaRenderError("Typst was not found. Make sure typst is on Raycast's PATH."));
         }
 
         const output = [stdout, stderr].filter(Boolean).join("\n");
-        if (executable === "typst" && error.code === "ENOENT") {
-          reject(new FormulaRenderError("Typst was not found. Make sure typst is on Raycast's PATH."));
-          return;
-        }
-
-        const detail = executable === "typst" ? output.trim() : extractLatexError(output);
+        const detail = isTypst ? output.trim() : extractLatexError(output);
         const message =
           "killed" in error && error.killed
             ? `Rendering timed out after ${PROCESS_TIMEOUT_MS / 1000} seconds.`
@@ -200,13 +182,12 @@ function runCommand(
 }
 
 function buildDocument(latex: string, preamble: string) {
-  const customPreamble = normalizePreamble(preamble);
-  const customPreambleBlock = customPreamble === "" ? "" : `${customPreamble}\n`;
+  const customPreamble = preamble.replace(/\r\n?/g, "\n").trim();
 
   return `\\documentclass[12pt]{article}
 \\usepackage{amsmath}
 \\usepackage{amssymb}
-${customPreambleBlock}\\pagestyle{empty}
+${customPreamble ? `${customPreamble}\n` : ""}\\pagestyle{empty}
 \\begin{document}
 \\thispagestyle{empty}
 \\[
@@ -214,10 +195,6 @@ ${latex}
 \\]
 \\end{document}
 `;
-}
-
-function normalizePreamble(preamble: string) {
-  return preamble.replace(/\r\n?/g, "\n").trim();
 }
 
 function extractLatexError(output: string) {
