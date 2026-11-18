@@ -1,111 +1,83 @@
-# Quick Math
+<div align="center">
+  <img src="assets/circular-integral.png" width="128" height="128" alt="Quick Math Icon" />
+  <h1>Quick Math</h1>
+  <p><strong>Raycast extension that render LaTeX and Typst formulas locally on macOS and copy them as transparent PNGs.</strong></p>
+</div>
 
-Quick Math renders LaTeX or Typst formulas on your Mac and copies the result to
-the clipboard as a tightly cropped, transparent PNG.
+---
 
-## Credits
+**Quick Math** is a [Raycast](https://www.raycast.com/) extension that turns LaTeX or Typst formulas into crisp, transparent PNGs (512 DPI) ready for your clipboard. Perfect for pasting formatted math expressions directly into notes, slides, documents, or chat apps.
 
-Quick Math is based on [QuickLaTeX](https://github.com/Noamko/QuickLaTeX),
-originally created by [Noamko](https://github.com/Noamko) and published as the
-[quick-latex Raycast extension](https://github.com/raycast/extensions/tree/main/extensions/quick-latex).
+## Features
 
-- Current maintainer: Harumaru169
-- Original author and contributor: Noamko
-- Contributor: FariaF22
-
-Quick Math is distributed under the [MIT License](LICENSE).
+- 💻 **Local & Offline**: Renders entirely on your machine—fast, private, and works without an internet connection.
+- 🎭 **Dual Engine Support**: Switch between **LaTeX** (default) and **Typst** math syntax.
+- 😼 **Adaptive Preview**: Real-time previews supporting both light and dark themes in Raycast.
+- ✂️ **Tightly Cropped Output**: High-resolution (512 DPI) transparent PNGs with tight bounding boxes.
+- 🛠️ **Custom Preamble**: Easily include your favorite LaTeX packages (`mathtools`, `physics`, `bm`, etc.) and macro definitions.
 
 ## Requirements
 
-- Raycast for macOS
-- For LaTeX mode (the default), BasicTeX or MacTeX with `latex` and `dvipng`
-  under `/Library/TeX/texbin`
-- For Typst mode, the `typst` command on Raycast's `PATH`
+Ensure the following prerequisites are installed on your Mac before using Quick Math:
 
-## Typst mode
+### General
+- macOS
+- [Raycast](https://www.raycast.com/)
 
-In Raycast Settings, open **Quick Math** and set **Rendering Engine** to
-**Typst**. In the Quick Math command, type `frac(a, b)` or another Typst
-formula. The command adds the math delimiters for you. Press Enter to copy the
-rendered PNG.
+### For LaTeX Mode (Default)
+The extension directly calls binaries under `/Library/TeX/texbin`:
+- **Executables**:
+  - `/Library/TeX/texbin/latex`
+  - `/Library/TeX/texbin/dvipng`
+- **TeX Packages**:
+  - `amsmath`
+  - `amssymb`
+  *(plus any packages specified in your custom preamble)*
 
-## LaTeX setup
+### For Typst Mode
+- **Executable**:
+  - `typst` CLI available in Raycast's `$PATH`
 
-Check the TeX installation:
+## Usage
 
-```sh
-/Library/TeX/texbin/latex --version
-/Library/TeX/texbin/kpsewhich amsmath.sty
-/Library/TeX/texbin/kpsewhich amssymb.sty
-```
+1. Open **Quick Math** in Raycast (or launch via your assigned hotkey).
+2. Enter your formula:
+   - **LaTeX**: Type expressions directly (e.g., `\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}`). Document structure and math environments are wrapped automatically.
+   - **Typst**: Type Typst math expressions (e.g., `frac(a, b)` or `integral_0^oo e^(-x^2) dif x = sqrt(pi)`).
+3. Press **Enter** to copy the rendered transparent PNG.
+4. Paste it with **Cmd + V** into any app.
 
-BasicTeX does not install `dvipng` by default. Install it with:
+## Preferences
 
-```sh
-sudo /Library/TeX/texbin/tlmgr install dvipng
-```
+Configure options in **Raycast Settings → Extensions → Quick Math**:
 
-If TeX Live asks you to update its package manager first, run:
-
-```sh
-sudo /Library/TeX/texbin/tlmgr update --self
-sudo /Library/TeX/texbin/tlmgr install dvipng
-```
-
-Then verify it:
-
-```sh
-/Library/TeX/texbin/dvipng --version
-```
+| Setting | Type | Description |
+|---|---|---|
+| **Rendering Engine** | Dropdown | Choose between `LaTeX` (default) and `Typst`. |
+| **Custom Preamble** | Text | *(LaTeX only)* Additional packages or macro definitions (e.g. `\usepackage{mathtools,physics,bm} \newcommand{\R}{\mathbb{R}}`). Inserted after `amsmath` and `amssymb`. |
 
 ## Development
 
-Install the JavaScript dependencies and start the Raycast development
-extension:
-
 ```sh
+# Install dependencies
 npm install
+
+# Start local extension in Raycast
 npm run dev
+
+# Run linter and build
+npm run lint
+npm run build
 ```
 
-You can then assign a Raycast hotkey to **Quick Math**. Type a formula, wait
-for the local preview, and press Enter to copy the transparent PNG. Paste it
-into Noteful or another app with Command-V.
+## Credits
 
-## Rendering defaults
+Quick Math is based on [LaTeX to Image (Quick LaTeX)](https://www.raycast.com/Noamko/quick-latex), originally created by [Noamko](https://github.com/Noamko). Quick Math adds local rendering and Typst support, with transparent PNG as the clipboard format.
 
-- Display math in both modes
-- `amsmath` and `amssymb` in LaTeX mode
-- Transparent background
-- Black clipboard output
-- 512 DPI
+- **Current Maintainer**: [Harumaru169](https://github.com/Harumaru169)
+- **Original Author**: [Noamko](https://github.com/Noamko)
+- **Contributors**: [FariaF22](https://github.com/FariaF22)
 
-Color, size, and SVG/PDF export are not part of the initial local renderer.
+## License
 
-## Custom preamble
-
-Open Raycast Settings, select **Quick Math**, and enter additional LaTeX
-commands in **Custom Preamble**. The setting is appended after the built-in
-`amsmath` and `amssymb` packages and applies to both previews and copied PNGs.
-
-Raycast provides this setting as a single-line field. LaTeX commands can be
-separated with spaces, for example:
-
-```tex
-\usepackage{amsmath,amsfonts, amssymb, amsthm, mathtools, theorem, bm, physics}
-```
-
-Package imports and definitions such as `\newcommand` and
-`\DeclareMathOperator` are supported. Do not include `\documentclass`,
-`\begin{document}`, or `\end{document}` because the extension supplies the
-document structure.
-
-To check whether a package is installed, pass its `.sty` file to `kpsewhich`:
-
-```sh
-/Library/TeX/texbin/kpsewhich physics.sty
-```
-
-An empty result means the package is not available in the active TeX
-installation. Invalid commands, missing packages, and package option conflicts
-are reported as LaTeX rendering errors.
+Distributed under the [MIT License](LICENSE).
