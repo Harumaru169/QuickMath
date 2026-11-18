@@ -9,6 +9,8 @@ const LATEX_PATH = path.join(TEX_BIN, "latex");
 const DVIPNG_PATH = path.join(TEX_BIN, "dvipng");
 const PROCESS_TIMEOUT_MS = 8_000;
 const MAX_PROCESS_OUTPUT = 1024 * 1024;
+// Leave room around the image in Raycast's List.EmptyView.
+const PREVIEW_BOUNDS = { width: 640, height: 300 };
 
 const LATEX_COLORS = {
   black: "rgb 0 0 0",
@@ -24,7 +26,7 @@ export class FormulaRenderError extends Error {
 }
 
 export async function renderPreview(formula: string, options: Preferences, signal?: AbortSignal) {
-  const [light, dark] = await renderImages(formula, options, ["black", "white"], signal);
+  const [light, dark] = await renderImages(formula, options, ["black", "white"], PREVIEW_BOUNDS, signal);
   return { source: { light: toPngDataUrl(light), dark: toPngDataUrl(dark) } };
 }
 
@@ -37,24 +39,29 @@ async function renderImages(
   formula: string,
   { renderer, preamble }: Preferences,
   colors: ForegroundColor[],
+  bounds?: { width: number; height: number },
   signal?: AbortSignal
 ) {
   const workDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "quick-math-"));
 
   try {
-    const images: Buffer[] = [];
-    if (renderer === "typst") {
-      for (const color of colors) {
-        images.push(await compileTypst(formula, workDirectory, color, signal));
-      }
-      return images;
+    const outputPath = path.join(workDirectory, "formula.png");
+    let dviPath: string | undefined;
+    if (renderer !== "typst") {
+      await checkLatexDependencies();
+      dviPath = await compileToDvi(formula.trim() ? formula : "LaTeX", preamble, workDirectory, signal);
     }
 
-    await checkLatexDependencies();
-    const latex = formula.trim() ? formula : "LaTeX";
-    const dviPath = await compileToDvi(latex, preamble, workDirectory, signal);
+    const images: Buffer[] = [];
     for (const color of colors) {
-      images.push(await convertDviToPng(dviPath, workDirectory, color, signal));
+      if (dviPath) {
+        await convertDviToPng(dviPath, outputPath, workDirectory, color, signal);
+      } else {
+        await compileTypst(formula, outputPath, workDirectory, color, signal);
+      }
+
+      const image = await fs.readFile(outputPath, { signal });
+      images.push(bounds ? await fitPreview(image, outputPath, bounds, signal) : image);
     }
     return images;
   } finally {
@@ -105,12 +112,11 @@ async function compileToDvi(latex: string, preamble: string, workDirectory: stri
 
 async function convertDviToPng(
   dviPath: string,
+  outputPath: string,
   workDirectory: string,
   foreground: ForegroundColor,
   signal?: AbortSignal
 ) {
-  const outputPath = path.join(workDirectory, "formula.png");
-
   await runCommand(
     DVIPNG_PATH,
     ["-D", "512", "-T", "tight", "-bg", "Transparent", "-fg", LATEX_COLORS[foreground], "-o", outputPath, dviPath],
@@ -118,11 +124,15 @@ async function convertDviToPng(
     signal,
     "dvipng could not create the PNG image."
   );
-
-  return fs.readFile(outputPath);
 }
 
-async function compileTypst(formula: string, workDirectory: string, foreground: ForegroundColor, signal?: AbortSignal) {
+async function compileTypst(
+  formula: string,
+  outputPath: string,
+  workDirectory: string,
+  foreground: ForegroundColor,
+  signal?: AbortSignal
+) {
   const source = `#set page(width: auto, height: auto, margin: 1pt, fill: none)
 #set text(size: 12pt, fill: ${foreground})
 $ ${formula.trim() || "x"} $
@@ -130,12 +140,34 @@ $ ${formula.trim() || "x"} $
   await fs.writeFile(path.join(workDirectory, "formula.typ"), source, "utf8");
   await runCommand(
     "typst",
-    ["compile", "--ppi", "512", "--diagnostic-format", "short", "formula.typ", "formula.png"],
+    ["compile", "--ppi", "512", "--diagnostic-format", "short", "formula.typ", outputPath],
     workDirectory,
     signal,
     "Typst could not render this formula."
   );
-  return fs.readFile(path.join(workDirectory, "formula.png"));
+}
+
+async function fitPreview(
+  image: Buffer,
+  outputPath: string,
+  bounds: { width: number; height: number },
+  signal?: AbortSignal
+) {
+  // The first PNG chunk (IHDR) stores the pixel width and height.
+  const width = image.readUInt32BE(16);
+  const height = image.readUInt32BE(20);
+  const scale = Math.min(bounds.width / width, bounds.height / height);
+  if (scale >= 1) return image;
+
+  const longestSide = Math.floor(Math.max(width, height) * scale);
+  await runCommand(
+    "/usr/bin/sips",
+    ["-Z", String(longestSide), outputPath],
+    path.dirname(outputPath),
+    signal,
+    "Could not resize the formula preview."
+  );
+  return fs.readFile(outputPath, { signal });
 }
 
 function runCommand(
