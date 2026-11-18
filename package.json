@@ -1,8 +1,8 @@
 {
     "$schema": "https://www.raycast.com/schemas/extension.json",
     "name": "quick-math",
-    "title": "Quick Math",
-    "description": "Render LaTeX or Typst math locally and copy it as a transparent PNG.",
+    "title": "Math to PNG",
+    "description": "Render LaTeX or Typst formulas locally, preview them, and copy them to the clipboard as transparent PNGs.",
     "icon": "circular-integral.png",
     "author": "Harumaru169",
     "contributors": [
@@ -45,7 +45,7 @@
     "commands": [
         {
             "name": "quick-math",
-            "title": "Quick Math",
+            "title": "Render Formula",
             "description": "Preview a LaTeX or Typst formula and copy it as a transparent PNG.",
             "mode": "view",
             "arguments": [
