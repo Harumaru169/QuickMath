@@ -22,8 +22,14 @@
             "required": false,
             "default": "latex",
             "data": [
-                { "title": "LaTeX", "value": "latex" },
-                { "title": "Typst", "value": "typst" }
+                {
+                    "title": "LaTeX",
+                    "value": "latex"
+                },
+                {
+                    "title": "Typst",
+                    "value": "typst"
+                }
             ]
         },
         {
@@ -53,7 +59,7 @@
         }
     ],
     "dependencies": {
-        "@raycast/api": "^1.104.23"
+        "@raycast/api": "^2.12.1"
     },
     "devDependencies": {
         "@types/node": "^22.19.17",
@@ -69,7 +75,8 @@
         "build": "ray build -e dist",
         "dev": "ray develop",
         "fix-lint": "ray lint --fix",
-        "lint": "ray lint"
+        "lint": "ray lint",
+        "publish": "npx @raycast/api@latest publish"
     },
     "platforms": [
         "macOS"
